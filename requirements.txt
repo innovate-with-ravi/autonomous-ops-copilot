@@ -1,0 +1,19 @@
+# Core
+langgraph>=1.2
+langgraph-cli[inmem]>=0.4
+colorama>=0.4.6
+langchain>=0.3
+langchain-core>=0.3
+
+# Model providers (stand-ins while Nebius billing is blocked)
+langchain-openai>=0.2
+langchain-google-genai>=2.0
+
+# Nebius Token Factory is OpenAI-compatible, so langchain-openai already
+# covers it once NEBIUS_API_KEY + base_url are set in llm.py -- no
+# separate package needed.
+
+# Later phases (uncomment as you reach them)
+# langgraph-checkpoint-postgres   # Phase 6
+# langgraph-store-postgres        # Phase 6
+# pytest                          # Phase 9
