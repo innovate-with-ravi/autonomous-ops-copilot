@@ -7,7 +7,7 @@ adding fallbacks, or moving to Nebius Token Factory later is a one-line
 change here -- nothing in nodes.py, agent.py, or the subgraphs needs to
 change.
 
-Current setup: Google Gemini as primary, OpenAi as automatic fallback
+Current setup: `Google Gemini as primary`, OpenAi as automatic fallback
 `add groq as OpenAi credits are exhausted`
 (via LangChain's `.with_fallbacks()`), while Nebius billing is blocked.
 Rate limits / token-exceeded errors on one provider will silently retry
@@ -21,6 +21,9 @@ you want backed by Nemotron.
 
 import os
 from functools import lru_cache
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from langchain_openai import ChatOpenAI
 
@@ -38,7 +41,7 @@ except ImportError:
 def _openai(model: str):
     return ChatOpenAI(
         model=model,
-        api_key=os.environ["OPENAI_API_KEY"],#type:ignore
+        api_key=os.environ["OPENAI_API_KEY"],
         temperature=0,
     )
 
@@ -62,7 +65,7 @@ def _nebius(model: str):
     return ChatOpenAI(
         model=model,
         base_url="https://api.tokenfactory.us-central1.nebius.com/v1/",
-        api_key=os.environ["NEBIUS_API_KEY"], #type:ignore
+        api_key=os.environ["NEBIUS_API_KEY"],
         temperature=0,
     )
 
@@ -89,16 +92,16 @@ PROVIDER_REGISTRY = {
 """A dict which stores a list of (provider,model) corresponding to role"""
 ROLE_CONFIG = {
     "router": [
-        ("google", "gemini-2.0-flash"),
+        ("google", "gemini-3.7-flash"),
         ("openai", "gpt-4o-mini"),
     ],
     "reasoning": [
-        ("google", "gemini-2.0-pro"),
+        ("google", "gemini-3.1-pro-preview"),
         ("openai", "gpt-4o"),
     ],
     # one heavy llm is also needed
     "default": [
-        ("google", "gemini-2.0-flash"),
+        ("google", "gemini-3.7-flash"),
         ("openai", "gpt-4o-mini"),
     ],
 }
@@ -134,8 +137,8 @@ def get_llm(role: str = "default"):
     chain = ROLE_CONFIG[role]
     # chain = 
     # [
-    # 0 -    ("openai", "gpt-4o-mini"),
-    # 1 -    ("google", "gemini-2.0-flash"),
+    # 0 -    ("google", "gemini-2.0-flash"),
+    # 1 -    ("openai", "gpt-4o-mini"),
     # ]
     primary_provider, primary_model = chain[0]
     primary_provider_func = PROVIDER_REGISTRY[primary_provider]
