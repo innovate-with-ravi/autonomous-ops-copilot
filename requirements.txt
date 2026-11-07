@@ -8,6 +8,7 @@ langchain-core>=0.3
 # Model providers (stand-ins while Nebius billing is blocked)
 langchain-openai>=0.2
 langchain-google-genai>=2.0
+langchain-groq>=1.1
 
 # Nebius Token Factory is OpenAI-compatible, so langchain-openai already
 # covers it once NEBIUS_API_KEY + base_url are set in llm.py -- no

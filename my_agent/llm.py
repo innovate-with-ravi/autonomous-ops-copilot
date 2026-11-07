@@ -21,9 +21,13 @@ you want backed by Nemotron.
 
 import os
 from functools import lru_cache
+from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
+_env_path = Path(__file__).resolve().parent.parent / ".env"
+if _env_path.exists():
+    load_dotenv(_env_path)
 
 from langchain_openai import ChatOpenAI
 
@@ -33,15 +37,24 @@ try:
 except ImportError:
     _HAS_GOOGLE = False
 
+try:
+    from langchain_groq import ChatGroq
+    _HAS_GROQ = True
+except ImportError:
+    _HAS_GROQ = False
+
 
 # ---------------------------------------------------------------------------
 # Provider registry: provider name -> factory(model_name) -> chat model
 # ---------------------------------------------------------------------------
 
 def _openai(model: str):
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY environment variable not set.")
     return ChatOpenAI(
         model=model,
-        api_key=os.environ["OPENAI_API_KEY"],
+        api_key=api_key,
         temperature=0,
     )
 
@@ -52,9 +65,28 @@ def _google(model: str):
             "langchain-google-genai not installed. "
             "Run: pip install langchain-google-genai"
         )
+    api_key = os.environ.get("GOOGLE_API_KEY")
+    if not api_key:
+        raise ValueError("GOOGLE_API_KEY environment variable not set.")
     return ChatGoogleGenerativeAI(
         model=model,
-        google_api_key=os.environ["GOOGLE_API_KEY"],
+        google_api_key=api_key,
+        temperature=0,
+    )
+
+
+def _groq(model: str):
+    if not _HAS_GROQ:
+        raise ImportError(
+            "langchain-groq not installed. "
+            "Run: pip install langchain-groq"
+        )
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        raise ValueError("GROQ_API_KEY environment variable not set.")
+    return ChatGroq(
+        model=model,
+        api_key=api_key,
         temperature=0,
     )
 
@@ -62,10 +94,13 @@ def _google(model: str):
 def _nebius(model: str):
     # Stub for later: Nebius Token Factory is OpenAI-compatible, so this
     # reuses ChatOpenAI with a different base_url and key.
+    api_key = os.environ.get("NEBIUS_API_KEY")
+    if not api_key:
+        raise ValueError("NEBIUS_API_KEY environment variable not set.")
     return ChatOpenAI(
         model=model,
         base_url="https://api.tokenfactory.us-central1.nebius.com/v1/",
-        api_key=os.environ["NEBIUS_API_KEY"],
+        api_key=api_key,
         temperature=0,
     )
 
@@ -73,6 +108,7 @@ def _nebius(model: str):
 PROVIDER_REGISTRY = {
     "openai": _openai,
     "google": _google,
+    "groq": _groq,
     "nebius": _nebius,
 }
 
@@ -92,16 +128,18 @@ PROVIDER_REGISTRY = {
 """A dict which stores a list of (provider,model) corresponding to role"""
 ROLE_CONFIG = {
     "router": [
-        ("google", "gemini-3.7-flash"),
+        ("google", "gemini-3-flash-preview"),
+        ("groq", "llama-3.1-8b-instant"),
         ("openai", "gpt-4o-mini"),
     ],
     "reasoning": [
-        ("google", "gemini-3.1-pro-preview"),
+        ("google", "gemini-3-flash-preview"),
+        ("groq", "llama-3.3-70b-versatile"),
         ("openai", "gpt-4o"),
     ],
-    # one heavy llm is also needed
     "default": [
-        ("google", "gemini-3.7-flash"),
+        ("google", "gemini-3-flash-preview"),
+        ("groq", "llama-3.3-70b-versatile"),
         ("openai", "gpt-4o-mini"),
     ],
 }
@@ -111,11 +149,11 @@ ROLE_CONFIG = {
 #
 # ROLE_CONFIG["router"] = [
 #     ("nebius", "nvidia/nemotron-3-nano-30b-a3b"),
-#     ("openai", "gpt-4o-mini"),
+#     ("google", "gemini-2.0-flash"),
 # ]
 # ROLE_CONFIG["reasoning"] = [
 #     ("nebius", "nvidia/nemotron-3-ultra-...."),
-#     ("openai", "gpt-4o"),
+#     ("google", "gemini-2.0-flash"),
 # ]
 
 
@@ -135,19 +173,18 @@ def get_llm(role: str = "default"):
         )
 
     chain = ROLE_CONFIG[role]
-    # chain = 
-    # [
-    # 0 -    ("google", "gemini-2.0-flash"),
-    # 1 -    ("openai", "gpt-4o-mini"),
-    # ]
     primary_provider, primary_model = chain[0]
     primary_provider_func = PROVIDER_REGISTRY[primary_provider]
     llm = primary_provider_func(primary_model)
 
-    fallbacks = [
-        PROVIDER_REGISTRY[provider](model)
-        for provider, model in chain[1:]
-    ]
+    fallbacks = []
+    for provider, model in chain[1:]:
+        try:
+            fallbacks.append(PROVIDER_REGISTRY[provider](model))
+        except Exception:
+            # If fallback provider is missing API key, skip it safely
+            continue
+
     if fallbacks:
         llm = llm.with_fallbacks(fallbacks)
 

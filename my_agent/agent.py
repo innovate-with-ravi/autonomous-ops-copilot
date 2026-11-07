@@ -42,7 +42,7 @@ def build_graph():
     graph = StateGraph(OpsState)
 
     graph.add_node("agent", agent_node)
-    graph.add_node("tools", ToolNode(ALL_TOOLS)) # that's how we add ToolNode - by passing ALL_TOOLS as an argument to ToolNode constructor
+    graph.add_node("tools", ToolNode(ALL_TOOLS))
 
     graph.add_edge(START, "agent")
     graph.add_conditional_edges("agent", tools_condition)
@@ -56,6 +56,7 @@ def build_graph():
 graph = build_graph().compile()
 
 
+# to run this use command: python -m my_agent.agent
 if __name__ == "__main__":
     # Quick terminal smoke test: proves multi-turn memory + streaming
     # work before you touch the frontend.
